@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# Environments
+.venv/
+env/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# ML / Data
+*.pt
+*.pth
+*.ckpt
+*.bin
+data/
+output/
+checkpoint/
+
+# Archives (redundant with code)
+*.tar.gz
+*.zip
+*.rar
+
+# Jupyter
+.ipynb_checkpoints/
+
+# CUDA build
+*.o
+*.cu.o
