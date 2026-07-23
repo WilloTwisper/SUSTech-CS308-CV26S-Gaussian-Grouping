@@ -19,6 +19,23 @@ We achieve an average mIoU of **72.79%** across three LERF-Mask benchmark scenes
 
 ---
 
+## Segmentation Performance (LERF-Mask Benchmark)
+
+![Segmentation visualization](figures/00060.png)
+*Fig 1: Segmentation on figurines scene. Columns: GT RGB, rendered RGB, GT object color, predicted object color, feature map.*
+
+| Scene | mIoU | mBIoU | Best Class | Worst Class |
+|-------|------|-------|------------|-------------|
+| **Figurines** | 69.73% | 67.91% | Green apple (91.55%) | Red apple (0.00%) |
+| **Ramen** | 76.95% | 68.69% | Pork belly (94.41%) | Wavy noodles (16.63%) |
+| **Teatime** | 71.69% | 66.14% | Stuffed bear (96.09%) | Spoon handle (0.00%) |
+| **Average** | **72.79%** | **67.58%** | — | — |
+
+![Per-class IoU](figures/chart_classes.png)
+*Fig 2: Per-class IoU comparison — best vs worst performing categories across all scenes.*
+
+---
+
 ## Key Contributions
 
 ### 1. SAM 2 Video Mode Upgrade
@@ -31,11 +48,23 @@ We achieve an average mIoU of **72.79%** across three LERF-Mask benchmark scenes
 
 SAM 2's memory-based architecture with tuned parameters (`pred_iou_thresh=0.75`, `stability_score_thresh=0.75`, `min_mask_region_area=100`, propagation threshold=0.4) achieves superior temporal stability critical for multi-view 3DGS training.
 
+![SAM2 vs SAM1](figures/sam_compare_video.png)
+*Fig 3a: SAM1+DEVA vs SAM2 Video across three consecutive frames. Green boxes highlight a tracked object that persists in SAM2.*
+
+![Frame variation](figures/chart_frame_variation.png)
+*Fig 3b: Frame-by-frame mask variation — SAM2 video mode achieves 59% temporal stability improvement.*
+
+![Consistency chart](figures/chart_sam2_consistency.png)
+*Fig 3c: Inter-frame mask variation comparison — lower values indicate more stable masks.*
+
 ### 2. 3D Object Style Transfer (New Feature)
 
 Implemented `edit_style_transfer.py` from scratch — a feature described but not released by the original paper. **Method:** SH coefficient manipulation of the DC component shifts base color toward a target palette, while higher-order SH components are dampened for view-dependent consistency. All operations are vectorized GPU tensor ops.
 
 **10 style presets:** red, blue, green, gold, grayscale, sepia, purple, invert, vivid, pastel
+
+![Multi-object editing](figures/sequential_editing.png)
+*Fig 4: Multi-object independent editing. Left: original. Middle: Object 15 (toy chair) in red. Right: Object 57 (rubber duck) in blue. Background and non-target objects remain unchanged.*
 
 ### 3. GPU Compatibility Fixes (RTX 5070 Ti)
 
@@ -53,16 +82,7 @@ Patched CUDA submodules for NVIDIA Blackwell architecture (compute capability 12
 
 ---
 
-## Experimental Results
-
-### Segmentation Performance (LERF-Mask Benchmark)
-
-| Scene | mIoU | mBIoU | Best Class | Worst Class |
-|-------|------|-------|------------|-------------|
-| **Figurines** | 69.73% | 67.91% | Green apple (91.55%) | Red apple (0.00%) |
-| **Ramen** | 76.95% | 68.69% | Pork belly (94.41%) | Wavy noodles (16.63%) |
-| **Teatime** | 71.69% | 66.14% | Stuffed bear (96.09%) | Spoon handle (0.00%) |
-| **Average** | **72.79%** | **67.58%** | — | — |
+## Experiments & Analysis
 
 ### Ablation: Removal Threshold Sensitivity
 
@@ -73,9 +93,13 @@ Patched CUDA submodules for NVIDIA Blackwell architecture (compute capability 12
 | 0.80 | 1,083,767 (30.1%) | 3,518 (0.1%) | 5,239 (0.1%) |
 | 0.95 | 934,852 (26.0%) | 1,713 (0.0%) | 2,968 (0.1%) |
 
-Recommended: `removal_thresh = 0.8` as balance between coverage and precision.
+![Threshold sensitivity](figures/chart_threshold.png)
+*Fig 5: Effect of removal threshold on Gaussian selection across classes. Recommended: `removal_thresh = 0.8`.*
 
 ### Gaussian Redundancy Analysis
+
+![Opacity distribution](figures/chart_opacity_dist.png)
+*Fig 6: Gaussian opacity distribution and cumulative contribution.*
 
 - **Top 30%** of Gaussians contribute **92.4%** of total opacity
 - **31.8%** of Gaussians have opacity < 0.005 (nearly invisible)
@@ -95,6 +119,9 @@ Captured a real-world scene (green Creeper plush toy on black suitcase, dormitor
 | Frames | 129 (100% COLMAP registration) | 129 |
 | 3D points | 8,998 | 8,998 |
 
+![Custom data segmentation](figures/cloud_seg_00060.png)
+*Fig 7: 3D Gaussian segmentation of custom scene (cloud V100). Columns: original, rendered RGB, GT object color, predicted object color, feature map.*
+
 ### Failure Case Analysis
 
 | Scene | Worst Class | mIoU | Root Cause |
@@ -106,6 +133,11 @@ Captured a real-world scene (green Creeper plush toy on black suitcase, dormitor
 | Teatime | Cookies | 22.25% | Overlapping objects with similar appearance |
 
 Common failure modes all trace back to limitations in SAM-based mask generation.
+
+### VRAM-Quality Trade-off
+
+![VRAM chart](figures/chart_vram.png)
+*Fig 8: VRAM-quality trade-off analysis across hardware configurations (local RTX 5070 Ti 12GB vs cloud V100 32GB).*
 
 ---
 
@@ -134,23 +166,18 @@ Common failure modes all trace back to limitations in SAM-based mask generation.
 │   ├── edit_style_transfer.py    # [NEW] Style transfer via SH manipulation
 │   ├── scene/                    # Scene data handling
 │   ├── gaussian_renderer/        # Differentiable rasterizer
-│   ├── submodules/               # diff-gaussian-rasterization, simple-knn
+│   ├── submodules/
 │   │   ├── diff-gaussian-rasterization/  # [PATCHED] Added <cstdint> for GCC 13
 │   │   └── simple-knn/                   # [PATCHED] Added <cfloat> for FLT_MAX
 │   ├── utils/
 │   │   └── camera_utils.py       # [FIXED] Mask resize with -r flag
 │   ├── config/                   # Training & editing configs
 │   └── docs/                     # Original docs
-├── figures/                      # All result visualizations
-│   ├── chart_threshold.png       # Removal threshold sensitivity
-│   ├── chart_vram.png            # VRAM-quality trade-off
-│   ├── chart_sam2_consistency.png # SAM2 temporal consistency
-│   ├── id15_red_view80.png       # Style transfer example
-│   └── ... (30+ figures)
+├── figures/                      # 30+ result visualizations
 ├── report/
 │   ├── 26_final.pdf              # Final report (PDF)
 │   └── Report.md                 # Report source (Markdown)
-├── AGENTS.md                     # Development notes & key commands
+├── AGENTS.md                     # Development notes & commands
 └── README.md
 ```
 
@@ -196,7 +223,7 @@ python edit_style_transfer.py -m output/figurines_pretrained -s data/lerf_mask/f
 
 ---
 
-## Papers & References
+## Related Works
 
 | Reference | Venue | Relevance |
 |-----------|-------|-----------|
